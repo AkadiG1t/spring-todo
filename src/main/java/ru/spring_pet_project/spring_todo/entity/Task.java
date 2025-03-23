@@ -1,20 +1,17 @@
-package ru.spring_pet_project.spring_todo.entities;
+package ru.spring_pet_project.spring_todo.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import ru.spring_pet_project.spring_todo.entities.entitiesSupport.Status;
+import ru.spring_pet_project.spring_todo.enums.Status;
 
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "tasks")
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
-@EqualsAndHashCode
 public class Task {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
