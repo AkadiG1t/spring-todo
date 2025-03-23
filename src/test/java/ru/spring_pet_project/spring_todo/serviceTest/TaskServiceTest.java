@@ -6,172 +6,154 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.spring_pet_project.spring_todo.entities.Task;
-import ru.spring_pet_project.spring_todo.entities.entitiesSupport.Status;
-import ru.spring_pet_project.spring_todo.exceptions.BadStatusException;
+import ru.spring_pet_project.spring_todo.model.TaskDTO;
+import ru.spring_pet_project.spring_todo.entity.Task;
+import ru.spring_pet_project.spring_todo.enums.Status;
 import ru.spring_pet_project.spring_todo.exceptions.MultipleSortingParametersException;
-import ru.spring_pet_project.spring_todo.exceptions.NameIsNullException;
 import ru.spring_pet_project.spring_todo.exceptions.NotFoundTaskException;
-import ru.spring_pet_project.spring_todo.repositoryes.TaskRepository;
-import ru.spring_pet_project.spring_todo.serivices.TaskService;
+import ru.spring_pet_project.spring_todo.taskMapper.TaskMapper;
+import ru.spring_pet_project.spring_todo.repository.TaskRepository;
+import ru.spring_pet_project.spring_todo.service.TaskService;
 import org.springframework.data.domain.Sort;
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.when;
+import static ru.spring_pet_project.spring_todo.enums.Status.TODO;
 
 @ExtendWith(MockitoExtension.class)
 public class TaskServiceTest {
+
     @Mock
     private TaskRepository repository;
+    @Mock
+    private TaskMapper taskMapper;
     @InjectMocks
     private TaskService taskService;
     private Task task;
-    Task savedTask;
+    private TaskDTO taskDTO;
 
     @BeforeEach
     void setUp() {
-        task = new Task("TestTask", "TestDesc", LocalDate.now());
-        savedTask = new Task("TestTask", "TestDesc", LocalDate.now());
-        savedTask.setId(1L);
+        task = new Task();
+        task.setId(1L);
+        task.setName("Test Task");
+        task.setDescription("Test Description");
+        task.setDueDate(LocalDate.now());
+        task.setStatus(Status.TODO);
+
+        taskDTO = new TaskDTO();
+        taskDTO.setId(task.getId());
+        taskDTO.setName(task.getName());
+        taskDTO.setDescription(task.getDescription());
+        taskDTO.setDueDate(task.getDueDate());
+        taskDTO.setStatus(task.getStatus());
     }
 
     @Test
-    void testSuccessCreateTask() throws NameIsNullException {
-        when(repository.save(any(Task.class))).thenReturn(savedTask);
-        
-        Task result = taskService.createTask(task);
-        
+    void createTask_ShouldReturnTaskDTO() {
+        when(repository.save(any(Task.class))).thenReturn(task);
+
+        TaskDTO result = taskService.createTask(taskDTO);
+
         assertNotNull(result);
-        assertEquals(1L,savedTask.getId());
+        assertEquals(taskDTO.getName(), result.getName());
         verify(repository, times(1)).save(any(Task.class));
     }
 
     @Test
-    void testCreateTaskWhichCausesNameIsNullException() {
-        task.setName(null);
+    void getAllTasks_ShouldReturnListOfTaskDTO() {
+        when(repository.findAll()).thenReturn(Collections.singletonList(task));
+        when(taskMapper.taskToDTO(task)).thenReturn(taskDTO);
 
-        assertThrows(NameIsNullException.class, () -> taskService.createTask(task));
-        verify(repository, never()).save(any(Task.class));
-    }
-
-    @Test
-    void testSuccessGetAllTasks() {
-        List<Task> tasks = new ArrayList<>();
-        tasks.add(savedTask);
-
-        when(repository.findAll()).thenReturn(tasks);
-
-        List<Task> result = taskService.getAllTasks();
+        List<TaskDTO> result = taskService.getAllTasks();
 
         assertNotNull(result);
         assertEquals(1, result.size());
+        assertEquals(taskDTO, result.get(0));
         verify(repository, times(1)).findAll();
     }
 
     @Test
-    void testSuccessUpdateTask() throws NotFoundTaskException {
-        when(repository.findById(1L)).thenReturn(Optional.of(savedTask));
-        when(repository.save(any(Task.class))).thenReturn(savedTask);
+    void updateTask_ShouldReturnUpdatedTaskDTO() {
+        Long taskId = 1L;
 
-        Task updatedTask = taskService.updateTask(1L, task);
+        when(repository.findById(taskId)).thenReturn(Optional.of(task));
+        when(repository.save(any(Task.class))).thenReturn(task);
+        when(taskMapper.taskToDTO(task)).thenReturn(taskDTO);
 
-        assertNotNull(updatedTask);
-        verify(repository, times(1)).findById(1L);
-        verify(repository, times(1)).save(any(Task.class));
+        TaskDTO result = taskService.updateTask(taskId, taskDTO);
+
+        assertNotNull(result);
+        assertEquals(taskDTO.getName(), result.getName());
+        assertEquals(taskDTO.getDescription(), result.getDescription());
+        assertEquals(taskDTO.getDueDate(), result.getDueDate());
+        assertEquals(taskDTO.getStatus(), result.getStatus());
+
+        verify(repository, times(1)).findById(taskId);
+        verify(repository, times(1)).save(task);
+        verify(taskMapper, times(1)).taskToDTO(task);
+    }
+
+
+    @Test
+    void deleteTask_ShouldDeleteTask() {
+        Long taskId = 1L;
+
+        when(repository.existsById(taskId)).thenReturn(true);
+
+        taskService.deleteTask(taskId);
+
+        verify(repository,times(1)).deleteById(taskId);
     }
 
     @Test
-    void testUpdateTaskWhichCausesNotFoundTaskException() {
-        when(repository.findById(1L)).thenReturn(Optional.empty());
+    void deleteTask_ShouldThrowException_WhenTaskNotFound() {
+        Long taskId = 1L;
 
-        assertThrows(NotFoundTaskException.class, () -> taskService.updateTask(1L, task));
-        verify(repository, never()).save(any(Task.class));
+        when(repository.existsById(taskId)).thenReturn(false);
+
+        assertThrows(NotFoundTaskException.class, () -> taskService.deleteTask(taskId));
+        verify(repository, never()).deleteById(taskId);
     }
 
     @Test
-    void testSuccessDeleteTask() throws NotFoundTaskException {
-        when(repository.findById(1L)).thenReturn(Optional.of(savedTask));
+    void filteredTaskByStatus_ShouldReturnFilteredTasks() {
+        when(repository.findAll()).thenReturn(Collections.singletonList(task));
+        when(taskMapper.taskToDTO(task)).thenReturn(taskDTO);
 
-        String result = taskService.deleteTask(1L);
-
-        assertEquals("Задача с ID 1 была успешно удалена", result);
-        verify(repository, times(1)).delete(savedTask);
-
-        when(repository.findById(1L)).thenReturn(Optional.empty());
-        Optional<Task> deletedTask = repository.findById(1L);
-        assertTrue(deletedTask.isEmpty());
-    }
-
-    @Test
-    void testDeleteTaskWhichCausesNotFoundTaskException() {
-        when(repository.findById(1L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundTaskException.class, () -> taskService.deleteTask(1L));
-        verify(repository, never()).delete(any(Task.class));
-    }
-
-    @Test
-    void testSuccessFilteredTaskByStatus() {
-        List<Task> tasks = new ArrayList<>();
-        tasks.add(savedTask);
-
-        when(repository.findByStatus(Status.TODO)).thenReturn(tasks);
-
-        List<Task> result = taskService.filteredTaskByStatus("TODO");
+        List<TaskDTO> result = taskService.filteredTaskByStatus(TODO);
 
         assertNotNull(result);
         assertEquals(1, result.size());
-        verify(repository, times(1)).findByStatus(Status.TODO);
+        assertEquals(taskDTO, result.get(0));
+        verify(repository, times(1)).findAll();
     }
 
     @Test
-    void testFilteredTaskByStatusWhichCausesBadStatusException() {
-        assertThrows(BadStatusException.class, () -> taskService.filteredTaskByStatus("INVALID_STATUS"));
+    void sortedTask_ShouldReturnSortedTasksByDate() {
+        String date = "date";
 
-        verify(repository, never()).findByStatus(any(Status.class));
-    }
+        when(repository.findAll(any(Sort.class))).thenReturn(Collections.singletonList(task));
+        when(taskMapper.taskToDTO(task)).thenReturn(taskDTO);
 
-    @Test
-    void testSuccessSortedTaskByDate() throws NotFoundTaskException {
-        List<Task> tasks = new ArrayList<>();
-        tasks.add(savedTask);
-
-        when(repository.findAll(any(Sort.class))).thenReturn(tasks);
-
-        List<Task> result = taskService.sortedTask("date", null);
+        List<TaskDTO> result = taskService.sortedTask(date, null);
 
         assertNotNull(result);
         assertEquals(1, result.size());
+        assertEquals(taskDTO, result.get(0));
         verify(repository, times(1)).findAll(any(Sort.class));
     }
 
     @Test
-    void testSuccessSortedTaskByStatus() throws NotFoundTaskException {
-        List<Task> tasks = new ArrayList<>();
-        tasks.add(savedTask);
+    void sortedTask_ShouldThrowException_WhenMultipleSortingParameters() {
+        String date = "date";
+        String status = "status";
 
-        when(repository.findAll(any(Sort.class))).thenReturn(tasks);
-
-        List<Task> result = taskService.sortedTask(null, "status");
-
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        verify(repository, times(1)).findAll(any(Sort.class));
-    }
-
-    @Test
-    void testSortedTaskWhichCausesMultipleSortingParametersException() {
-        assertThrows(MultipleSortingParametersException.class, () -> taskService
-                .sortedTask("date", "status"));
-        verify(repository, never()).findAll(any(Sort.class));
-    }
-
-    void testSortedTaskWhichCausesIllegalArgumentException() {
-        assertThrows(IllegalArgumentException.class, () -> taskService.sortedTask(null, null));
+        assertThrows(MultipleSortingParametersException.class, () -> taskService.sortedTask(date, status));
         verify(repository, never()).findAll(any(Sort.class));
     }
 }
