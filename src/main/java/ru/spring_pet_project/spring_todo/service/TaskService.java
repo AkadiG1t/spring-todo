@@ -26,13 +26,9 @@ public class TaskService {
         Optional.ofNullable(requestTask).orElseThrow(()
                 -> new EmptyRequestTaskException("Задача не может быть пустой"));
 
-        Task createdTask = new Task(requestTask.getName(), requestTask.getDescription(), requestTask.getDueDate());
-        repository.save(createdTask);
+        Task task = repository.save(taskMapper.dtoToTask(requestTask));
 
-        requestTask.setId(createdTask.getId());
-        requestTask.setStatus(createdTask.getStatus());
-
-        return requestTask;
+        return taskMapper.taskToDTO(task);
     }
 
     @Transactional
@@ -52,21 +48,17 @@ public class TaskService {
         Task updatedTask = repository.findById(id)
                 .orElseThrow(() -> new NotFoundTaskException("Задача с ID " + id + " не найдена"));
 
-        if (taskDTO.getName() != null) {
-            updatedTask.setName(taskDTO.getName());
-        }
+        Optional.ofNullable(taskDTO.getName())
+                .ifPresent(updatedTask::setName);
 
-        if (taskDTO.getDescription() != null) {
-            updatedTask.setDescription(taskDTO.getDescription());
-        }
+        Optional.ofNullable(taskDTO.getDescription())
+                .ifPresent(updatedTask::setDescription);
 
-        if (taskDTO.getDueDate() != null) {
-            updatedTask.setDueDate(taskDTO.getDueDate());
-        }
+        Optional.ofNullable(taskDTO.getDueDate())
+                .ifPresent(updatedTask::setDueDate);
 
-        if (taskDTO.getStatus() != null) {
-            updatedTask.setStatus(taskDTO.getStatus());
-        }
+        Optional.ofNullable(taskDTO.getStatus())
+                        .ifPresent(updatedTask::setStatus);
 
         repository.save(updatedTask);
 

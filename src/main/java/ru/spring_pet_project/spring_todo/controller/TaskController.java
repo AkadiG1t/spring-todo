@@ -1,7 +1,7 @@
 package ru.spring_pet_project.spring_todo.controller;
 
 import jakarta.validation.Valid;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -19,7 +19,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/tasks")
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class TaskController {
     private final TaskService taskService;
 
