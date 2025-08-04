@@ -21,6 +21,9 @@ public class Task {
     LocalDate dueDate;
     @Enumerated(EnumType.STRING)
     Status status;
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    User user;
 
     public Task (String name, String description, LocalDate dueDate) {
         this.name = name;
